@@ -1,0 +1,106 @@
+services:
+  identity-postgres:
+    image: postgres:16-alpine
+    container_name: bata-identity-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: identity_user
+      POSTGRES_PASSWORD: identity_pass
+      POSTGRES_DB: identity_db
+    ports:
+      - '5432:5432'
+    volumes:
+      - identity_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U identity_user -d identity_db']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  identity-redis:
+    image: redis:7-alpine
+    container_name: bata-identity-redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  product-postgres:
+    image: postgres:16-alpine
+    container_name: bata-product-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: product_user
+      POSTGRES_PASSWORD: product_pass
+      POSTGRES_DB: product_db
+    ports:
+      - '5433:5432'
+    volumes:
+      - product_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U product_user -d product_db']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  reporting-postgres:
+    image: postgres:16-alpine
+    container_name: bata-reporting-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: reporting_user
+      POSTGRES_PASSWORD: reporting_pass
+      POSTGRES_DB: reporting_db
+    ports:
+      - '5434:5432'
+    volumes:
+      - reporting_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U reporting_user -d reporting_db']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  sales-postgres:
+    image: postgres:16-alpine
+    container_name: bata-sales-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sales_user
+      POSTGRES_PASSWORD: sales_pass
+      POSTGRES_DB: sales_db
+    ports:
+      - '5435:5432'
+    volumes:
+      - sales_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U sales_user -d sales_db']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: bata-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: bata
+      RABBITMQ_DEFAULT_PASS: bata_pass
+    ports:
+      - '5672:5672'
+      - '15672:15672'
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+volumes:
+  identity_postgres_data:
+  product_postgres_data:
+  reporting_postgres_data:
+  sales_postgres_data:

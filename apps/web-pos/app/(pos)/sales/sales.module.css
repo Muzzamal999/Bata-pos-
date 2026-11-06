@@ -1,0 +1,21 @@
+.layout {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 65% 35%;
+  min-height: 0;
+}
+
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.left {
+  overflow-y: auto;
+  min-width: 0;
+}
+
+.right {
+  min-width: 0;
+}

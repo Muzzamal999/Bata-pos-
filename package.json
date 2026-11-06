@@ -1,0 +1,8 @@
+{
+  "name": "bata-pos",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}

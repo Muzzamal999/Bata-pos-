@@ -1,0 +1,49 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.admin {
+  color: var(--color-role-admin);
+  background: var(--color-role-admin-tint);
+}
+
+.staff {
+  color: var(--color-role-staff);
+  background: var(--color-role-staff-tint);
+}
+
+.customer {
+  color: var(--color-role-customer);
+  background: var(--color-role-customer-tint);
+}
+
+.success {
+  color: var(--color-success);
+  background: var(--color-success-tint);
+}
+
+.warning {
+  color: var(--color-warning);
+  background: var(--color-warning-tint);
+}
+
+.danger {
+  color: var(--color-danger);
+  background: var(--color-danger-tint);
+}
+
+.info {
+  color: var(--color-info);
+  background: var(--color-info-tint);
+}
+
+.neutral {
+  color: var(--color-text-secondary);
+  background: var(--color-bg);
+}

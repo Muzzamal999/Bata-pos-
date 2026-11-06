@@ -1,0 +1,394 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Brand {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @db.Uuid
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products Product[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("brands")
+}
+
+model Category {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @db.Uuid
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products Product[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("categories")
+}
+
+model Product {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @db.Uuid
+  articleNumber String
+  name          String
+  description   String?
+  brandId       String?  @db.Uuid
+  categoryId    String?  @db.Uuid
+  metadata      Json?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  brand    Brand?           @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  category Category?        @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  images   ProductImage[]
+  variants ProductVariant[]
+  prices   Price[]
+
+  @@unique([tenantId, articleNumber])
+  @@index([tenantId])
+  @@index([brandId])
+  @@index([categoryId])
+  @@map("products")
+}
+
+model ProductImage {
+  id        String   @id @default(uuid()) @db.Uuid
+  productId String   @db.Uuid
+  url       String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@map("product_images")
+}
+
+model ProductVariant {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @db.Uuid
+  productId String   @db.Uuid
+  size      String
+  color     String
+  sku       String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product       Product                @relation(fields: [productId], references: [id], onDelete: Cascade)
+  barcodes      Barcode[]
+  prices        Price[]
+  balances      StockBalance[]
+  movements     StockMovement[]
+  inwardLines   StockInwardLine[]
+  transferLines StockTransferLine[]
+  reservations  InventoryReservation[]
+
+  @@unique([tenantId, sku])
+  @@unique([productId, size, color])
+  @@index([tenantId])
+  @@index([productId])
+  @@map("product_variants")
+}
+
+model Barcode {
+  id        String   @id @default(uuid()) @db.Uuid
+  variantId String   @db.Uuid
+  code      String
+  createdAt DateTime @default(now())
+
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  // Barcodes (UPC/EAN/etc.) are globally unique identifiers by convention,
+  // not scoped per tenant - two tenants can never legitimately claim the
+  // same physical barcode.
+  @@unique([code])
+  @@index([variantId])
+  @@map("barcodes")
+}
+
+// amount is a tax-EXCLUSIVE base price. Tax policy is deliberately not
+// modeled here - it's configurable, cross-cutting, and owned by whichever
+// service ultimately applies it at the point of sale (Sales & POS, not yet
+// built). Hardcoding a tax rate or tax-inclusive amount here would bake in
+// a policy this service has no business owning.
+model Price {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @db.Uuid
+  productId     String?   @db.Uuid
+  variantId     String?   @db.Uuid
+  branchId      String?   @db.Uuid
+  amount        Decimal   @db.Decimal(12, 2)
+  currency      String    @default("PKR")
+  effectiveFrom DateTime  @default(now())
+  effectiveTo   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  product Product?        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  history PriceHistory[]
+
+  @@index([tenantId, productId, branchId])
+  @@index([tenantId, variantId, branchId])
+  @@map("prices")
+}
+
+model PriceHistory {
+  id              String    @id @default(uuid()) @db.Uuid
+  priceId         String    @db.Uuid
+  tenantId        String    @db.Uuid
+  productId       String?   @db.Uuid
+  variantId       String?   @db.Uuid
+  branchId        String?   @db.Uuid
+  amount          Decimal   @db.Decimal(12, 2)
+  currency        String
+  effectiveFrom   DateTime
+  effectiveTo     DateTime?
+  action          String
+  changedByUserId String?   @db.Uuid
+  changedAt       DateTime  @default(now())
+
+  price Price @relation(fields: [priceId], references: [id], onDelete: Cascade)
+
+  @@index([priceId])
+  @@index([tenantId])
+  @@map("price_history")
+}
+
+enum StockMovementType {
+  STOCK_IN
+  STOCK_OUT
+  ADJUSTMENT
+  DAMAGE
+}
+
+// A local proxy for a Service 1 branch, keyed by its opaque branchId (no FK -
+// Branch lives in a different database entirely). Created on first use so
+// callers never need a separate "register this branch" step before posting
+// stock movements against it.
+model StockLocation {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @db.Uuid
+  branchId  String   @db.Uuid
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  balances     StockBalance[]
+  movements    StockMovement[]
+  reservations InventoryReservation[]
+
+  @@unique([tenantId, branchId])
+  @@map("stock_locations")
+}
+
+model StockBalance {
+  id                String   @id @default(uuid()) @db.Uuid
+  tenantId          String   @db.Uuid
+  locationId        String   @db.Uuid
+  variantId         String   @db.Uuid
+  onHandQty         Int      @default(0)
+  reservedQty       Int      @default(0)
+  lowStockThreshold Int?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  location StockLocation  @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  variant  ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([locationId, variantId])
+  @@index([tenantId])
+  @@index([variantId])
+  @@map("stock_balances")
+}
+
+// Immutable by convention - never updated or deleted after creation. Every
+// row is a permanent entry in the stock ledger; corrections are made with a
+// new offsetting movement (e.g. an ADJUSTMENT), never by editing history.
+model StockMovement {
+  id              String            @id @default(uuid()) @db.Uuid
+  tenantId        String            @db.Uuid
+  locationId      String            @db.Uuid
+  variantId       String            @db.Uuid
+  type            StockMovementType
+  quantityDelta   Int
+  balanceAfter    Int
+  reference       String?
+  idempotencyKey  String
+  createdByUserId String?           @db.Uuid
+  createdAt       DateTime          @default(now())
+
+  location StockLocation  @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  variant  ProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, locationId, variantId])
+  @@map("stock_movements")
+}
+
+enum StockInwardStatus {
+  DRAFT
+  CONFIRMED
+}
+
+model StockInwardReceipt {
+  id                String            @id @default(uuid()) @db.Uuid
+  tenantId          String            @db.Uuid
+  branchId          String            @db.Uuid
+  referenceNumber   String
+  status            StockInwardStatus @default(DRAFT)
+  supplierReference String?
+  createdByUserId   String?           @db.Uuid
+  confirmedAt       DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  lines StockInwardLine[]
+
+  @@unique([tenantId, referenceNumber])
+  @@index([tenantId, branchId])
+  @@map("stock_inward_receipts")
+}
+
+model StockInwardLine {
+  id          String   @id @default(uuid()) @db.Uuid
+  receiptId   String   @db.Uuid
+  variantId   String   @db.Uuid
+  expectedQty Int
+  receivedQty Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  receipt StockInwardReceipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  variant ProductVariant     @relation(fields: [variantId], references: [id], onDelete: Restrict)
+
+  @@index([receiptId])
+  @@index([variantId])
+  @@map("stock_inward_lines")
+}
+
+enum StockTransferStatus {
+  DRAFT
+  REQUESTED
+  APPROVED
+  DISPATCHED
+  IN_TRANSIT
+  RECEIVED
+  REJECTED
+  CANCELLED
+}
+
+enum ReservationStatus {
+  ACTIVE
+  RELEASED
+  CONSUMED
+}
+
+model StockTransfer {
+  id                  String              @id @default(uuid()) @db.Uuid
+  tenantId            String              @db.Uuid
+  referenceNumber     String
+  sourceBranchId      String              @db.Uuid
+  destinationBranchId String              @db.Uuid
+  status              StockTransferStatus @default(DRAFT)
+  notes               String?
+  requestedByUserId   String?             @db.Uuid
+  approvedByUserId    String?             @db.Uuid
+  rejectedByUserId    String?             @db.Uuid
+  cancelledByUserId   String?             @db.Uuid
+  requestedAt         DateTime?
+  approvedAt          DateTime?
+  dispatchedAt        DateTime?
+  inTransitAt         DateTime?
+  receivedAt          DateTime?
+  rejectedAt          DateTime?
+  cancelledAt         DateTime?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  lines        StockTransferLine[]
+  reservations InventoryReservation[]
+
+  @@unique([tenantId, referenceNumber])
+  @@index([tenantId, sourceBranchId])
+  @@index([tenantId, destinationBranchId])
+  @@map("stock_transfers")
+}
+
+model StockTransferLine {
+  id            String   @id @default(uuid()) @db.Uuid
+  transferId    String   @db.Uuid
+  variantId     String   @db.Uuid
+  requestedQty  Int
+  dispatchedQty Int?
+  receivedQty   Int?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  transfer StockTransfer  @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  variant  ProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
+
+  @@index([transferId])
+  @@index([variantId])
+  @@map("stock_transfer_lines")
+}
+
+// One row per reservation event, so the reason reservedQty moved is
+// auditable - not just an opaque counter increment on StockBalance.
+model InventoryReservation {
+  id         String            @id @default(uuid()) @db.Uuid
+  tenantId   String            @db.Uuid
+  transferId String            @db.Uuid
+  locationId String            @db.Uuid
+  variantId  String            @db.Uuid
+  quantity   Int
+  status     ReservationStatus @default(ACTIVE)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  transfer StockTransfer  @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  location StockLocation  @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  variant  ProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
+
+  @@index([transferId])
+  @@index([locationId, variantId])
+  @@map("inventory_reservations")
+}
+
+// Transactional outbox: written in the same DB transaction as the business
+// change it describes, so an event is recorded if and only if that change
+// actually committed. A separate relay polls unpublished rows and forwards
+// them to RabbitMQ - the HTTP request path never talks to the broker
+// directly, so a broker outage delays delivery but never loses an event or
+// blocks the API.
+model OutboxEvent {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @db.Uuid
+  eventType    String
+  eventVersion String    @default("v1")
+  payload      Json
+  createdAt    DateTime  @default(now())
+  publishedAt  DateTime?
+
+  @@index([publishedAt, createdAt])
+  @@map("outbox_events")
+}

@@ -1,0 +1,146 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Uniform idempotency ledger for every event consumer. Each handler checks
+// and inserts here in the SAME transaction as its projection write; a
+// duplicate delivery of the same event just hits this primary key and is
+// skipped, rather than being applied twice.
+model ProcessedEvent {
+  id          String   @id @db.Uuid // the source event's own id, not generated here
+  eventType   String
+  processedAt DateTime @default(now())
+
+  @@index([eventType])
+  @@map("processed_events")
+}
+
+enum SaleStatus {
+  COMPLETED
+  REFUNDED
+}
+
+// Built from SaleCompleted/SaleRefunded - an ASSUMED contract, since Sales &
+// POS does not exist yet and there is no real payload to inspect. Field
+// names are a reasonable best guess; expect to adjust once Sales actually
+// starts publishing.
+model SaleRecord {
+  id            String     @id @default(uuid()) @db.Uuid
+  tenantId      String     @db.Uuid
+  branchId      String     @db.Uuid
+  saleId        String // the external, source-of-truth sale identifier from Sales & POS
+  cashierId     String?    @db.Uuid
+  totalAmount   Decimal    @db.Decimal(12, 2)
+  currency      String     @default("PKR")
+  paymentMethod String?
+  status        SaleStatus @default(COMPLETED)
+  occurredAt    DateTime
+  refundedAt    DateTime?
+  refundAmount  Decimal?   @db.Decimal(12, 2)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@unique([tenantId, saleId])
+  @@index([tenantId, branchId, occurredAt])
+  @@index([tenantId, cashierId])
+  @@map("sale_records")
+}
+
+// Line items of a SaleCompleted event - needed for best-selling-product
+// analytics, which can't be derived from the sale-level total alone. Part of
+// the same ASSUMED Sales & POS contract as SaleRecord.
+model SaleLineRecord {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @db.Uuid
+  branchId   String   @db.Uuid
+  saleId     String
+  variantId  String   @db.Uuid
+  quantity   Int
+  unitPrice  Decimal  @db.Decimal(12, 2)
+  occurredAt DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId, variantId])
+  @@index([tenantId, branchId, occurredAt])
+  @@map("sale_line_records")
+}
+
+// Built from StockReceived/StockAdjusted/StockTransferReceived - real,
+// verified Product & Inventory event contracts.
+model StockMovementRecord {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @db.Uuid
+  branchId     String   @db.Uuid
+  variantId    String   @db.Uuid
+  eventType    String
+  quantity     Int
+  // The source event's own post-movement balance, when it carries one
+  // (StockReceived/StockAdjusted do; a transfer line currently doesn't).
+  // This is the only honest basis for a "current balance" read - a sum of
+  // quantity deltas over an arbitrary date range is not the same thing.
+  balanceAfter Int?
+  occurredAt   DateTime
+  createdAt    DateTime @default(now())
+
+  @@index([tenantId, branchId, occurredAt])
+  @@index([tenantId, variantId])
+  @@map("stock_movement_records")
+}
+
+// Built from PriceUpdated - a real, verified Product & Inventory event contract.
+model PriceChangeRecord {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @db.Uuid
+  productId  String?  @db.Uuid
+  variantId  String?  @db.Uuid
+  branchId   String?  @db.Uuid
+  amount     Decimal  @db.Decimal(12, 2)
+  currency   String
+  occurredAt DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId, productId])
+  @@index([tenantId, variantId])
+  @@map("price_change_records")
+}
+
+// Immutable audit trail. No endpoint in this service ever updates or
+// deletes a row here, including for administrators.
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String?  @db.Uuid
+  actorUserId String?  @db.Uuid
+  action      String
+  entityType  String
+  entityId    String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+  @@index([entityType])
+  @@map("audit_logs")
+}
+
+// Messages that failed processing after retries are exhausted land here
+// instead of being lost or endlessly redelivered.
+model DeadLetterEvent {
+  id         String   @id @default(uuid()) @db.Uuid
+  eventType  String
+  payload    Json
+  error      String
+  retryCount Int      @default(0)
+  failedAt   DateTime @default(now())
+
+  @@map("dead_letter_events")
+}
