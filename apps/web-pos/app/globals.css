@@ -115,3 +115,22 @@ a {
 button {
   font-family: inherit;
 }
+
+/* Receipt printing: hides every other part of the app, leaving only the
+   element marked .print-area visible. Lives here (not a CSS module) since
+   CSS Modules rejects a selector with no local class, even under :global(). */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-area,
+  .print-area * {
+    visibility: visible;
+  }
+  .print-area {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+}

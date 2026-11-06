@@ -1,4 +1,5 @@
 import type {
+  CashMovement,
   CatalogCacheEntry,
   CatalogLookupResult,
   CheckoutRequest,
@@ -64,8 +65,9 @@ export class SalesPosApi {
     return data;
   }
 
-  async recordCashMovement(id: string, request: RecordCashMovementRequest): Promise<void> {
-    await this.client.post(`/shifts/${id}/cash-movements`, request);
+  async recordCashMovement(id: string, request: RecordCashMovementRequest): Promise<CashMovement> {
+    const { data } = await this.client.post<CashMovement>(`/shifts/${id}/cash-movements`, request);
+    return data;
   }
 
   // --- Catalog ---

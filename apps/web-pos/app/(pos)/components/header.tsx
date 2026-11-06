@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import type { CurrentUser } from '@bata-pos/shared-types';
-import { identityApi } from '../../../lib/api';
+import { identityApi, salesPosApi } from '../../../lib/api';
 import { useAuthStore } from '../../../lib/auth-store';
 import { useThemeStore } from '../../../lib/theme-store';
 import styles from './header.module.css';
@@ -23,6 +23,12 @@ export function Header({ user }: { user: CurrentUser | null }) {
     queryKey: ['branch', branchId],
     queryFn: () => identityApi.getBranch(branchId!),
     enabled: Boolean(branchId),
+    retry: false,
+  });
+
+  const { data: currentShift } = useQuery({
+    queryKey: ['current-shift'],
+    queryFn: () => salesPosApi.getCurrentShift(),
     retry: false,
   });
 
@@ -56,6 +62,28 @@ export function Header({ user }: { user: CurrentUser | null }) {
             : branchError
               ? `Branch ${branchId!.slice(0, 8)}…`
               : 'Loading branch…'}
+        </button>
+        <button
+          type="button"
+          className={styles.shiftPill}
+          onClick={() => router.push('/shift')}
+          title="Shift management"
+        >
+          <span className={`${styles.shiftDot} ${currentShift ? styles.shiftDotOpen : ''}`} />
+          {currentShift ? 'Shift Open' : 'No Shift'}
+        </button>
+        <button
+          type="button"
+          className={styles.iconButton}
+          onClick={() => router.push('/reprint')}
+          aria-label="Sale lookup, returns and receipts"
+          title="Sale lookup, returns and receipts"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
+            <path d="M6 9V2h12v7" />
+            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+            <rect x="6" y="14" width="12" height="8" />
+          </svg>
         </button>
         <button
           type="button"

@@ -10,10 +10,14 @@ vi.mock('next/navigation', () => ({
 
 const logoutMock = vi.fn();
 const getBranchMock = vi.fn();
+const getCurrentShiftMock = vi.fn();
 vi.mock('../lib/api', () => ({
   identityApi: {
     logout: (...args: unknown[]) => logoutMock(...args),
     getBranch: (...args: unknown[]) => getBranchMock(...args),
+  },
+  salesPosApi: {
+    getCurrentShift: (...args: unknown[]) => getCurrentShiftMock(...args),
   },
 }));
 
@@ -32,6 +36,7 @@ describe('Cashier logout', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getBranchMock.mockResolvedValue({ id: 'branch-1', code: '418', name: 'Kotli Main Branch' });
+    getCurrentShiftMock.mockResolvedValue(null);
   });
 
   it('calls the real logout endpoint, clears the session, and returns to login', async () => {

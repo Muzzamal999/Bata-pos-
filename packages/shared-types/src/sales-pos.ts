@@ -21,6 +21,7 @@ export interface SalePayment {
   method: PaymentMethod;
   amount: string;
   reference: string | null;
+  createdAt: string;
 }
 
 export interface Sale {
@@ -37,8 +38,11 @@ export interface Sale {
   currency: string;
   refundedAmount: string;
   refundedAt: string | null;
+  idempotencyKey: string;
   lines: SaleLine[];
   payments: SalePayment[];
+  /** Always embedded by the real GET /sales/:id response (loadOwnedSale includes it), never a separate round trip. */
+  refunds: Refund[];
   createdAt: string;
   updatedAt: string;
 }
@@ -84,6 +88,7 @@ export interface Refund {
   amount: string;
   reason: string | null;
   processedByUserId: string;
+  idempotencyKey: string;
   shiftId: string | null;
   createdAt: string;
 }
@@ -97,11 +102,19 @@ export interface Shift {
   cashierId: string;
   openingFloat: string;
   closingCash: string | null;
+  /**
+   * Only ever computed and persisted by the backend at close time
+   * (ShiftsService.close -> computeExpectedCash is private and never called
+   * from any other path) - null for the whole life of an open shift. There
+   * is no live "expected cash so far" read endpoint.
+   */
   expectedCash: string | null;
   variance: string | null;
   status: ShiftStatus;
   openedAt: string;
   closedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface OpenShiftRequest {
@@ -113,8 +126,19 @@ export interface CloseShiftRequest {
   closingCash: number;
 }
 
+export type CashMovementType = 'CASH_IN' | 'CASH_OUT';
+
+export interface CashMovement {
+  id: string;
+  shiftId: string;
+  type: CashMovementType;
+  amount: string;
+  reason: string | null;
+  createdAt: string;
+}
+
 export interface RecordCashMovementRequest {
-  type: 'CASH_IN' | 'CASH_OUT';
+  type: CashMovementType;
   amount: number;
   reason?: string;
 }

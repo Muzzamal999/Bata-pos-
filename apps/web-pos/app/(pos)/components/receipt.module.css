@@ -1,0 +1,161 @@
+.receipt {
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-family: 'Courier New', 'Courier', monospace;
+  padding: 20px;
+  margin: 0 auto;
+}
+
+.receiptA4 {
+  max-width: 560px;
+  font-size: 13px;
+}
+
+.receipt80mm {
+  max-width: 320px;
+  font-size: 12px;
+}
+
+.receipt58mm {
+  max-width: 230px;
+  font-size: 10.5px;
+  padding: 12px;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 14px;
+}
+
+.wordmark {
+  font-family: 'Georgia', 'Times New Roman', serif;
+  font-style: italic;
+  font-weight: 700;
+  font-size: 1.6em;
+  color: var(--color-brand-red);
+  display: block;
+}
+
+.title {
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+.storeInfo {
+  text-align: center;
+  color: var(--color-text-secondary);
+  margin-bottom: 14px;
+  line-height: 1.5;
+}
+
+.metaRow {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 2px;
+  color: var(--color-text-secondary);
+}
+
+.divider {
+  border: none;
+  border-top: 1px dashed var(--color-border-strong);
+  margin: 10px 0;
+}
+
+.lineItem {
+  margin-bottom: 8px;
+}
+
+.lineItemTop {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 700;
+}
+
+.lineItemMeta {
+  color: var(--color-text-muted);
+  font-size: 0.9em;
+}
+
+.lineItemQty {
+  display: flex;
+  justify-content: space-between;
+  color: var(--color-text-secondary);
+}
+
+.summaryRow {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+}
+
+.discountRow {
+  color: var(--color-danger);
+}
+
+.totalRow {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 700;
+  font-size: 1.15em;
+  padding-top: 6px;
+}
+
+.paymentSection {
+  margin-top: 4px;
+}
+
+.footer {
+  text-align: center;
+  margin-top: 16px;
+  color: var(--color-text-secondary);
+}
+
+.footerThanks {
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin-bottom: 4px;
+}
+
+/* --- Print ---
+ * The "hide everything except the receipt" rule lives in globals.css, not
+ * here: CSS Modules refuses any selector with no local class, even wrapped
+ * in :global(), and that rule (body * { visibility: hidden }) has none.
+ */
+@media print {
+  /* Every element below sets its own color from a theme CSS variable, which
+     stays resolved to the active (possibly dark) theme under print media -
+     print must look right on paper regardless of which theme is on screen,
+     so each one needs an explicit, print-safe override here. */
+  .receipt {
+    box-shadow: none;
+    background: #fff;
+    color: #000;
+  }
+  .wordmark {
+    color: #c8161f;
+  }
+  .storeInfo,
+  .metaRow,
+  .lineItemMeta,
+  .lineItemQty,
+  .summaryRow,
+  .footer {
+    color: #333;
+  }
+  .lineItem,
+  .lineItemTop,
+  .totalRow,
+  .footerThanks {
+    color: #000;
+  }
+  .discountRow {
+    color: #000;
+  }
+  .divider {
+    border-top-color: #999;
+  }
+}
+
+@page {
+  margin: 10mm;
+}

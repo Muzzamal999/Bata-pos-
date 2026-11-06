@@ -112,15 +112,18 @@ describe('Cart panel (display, quantities, clear confirmation, loading/empty sta
     expect(screen.getByText(/scan or select a product/i)).toBeInTheDocument();
   });
 
-  it('surfaces a checkout API error without crashing', async () => {
+  it('clicking Complete Sale opens the payment flow instead of checking out directly', async () => {
     useCartStore.getState().addItem(LINE);
-    checkoutMock.mockRejectedValue({ isAxiosError: true, response: { status: 400, data: { message: 'Insufficient stock' } } });
     renderWithQueryClient(<CartPanel />);
 
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: /complete sale/i }));
 
-    expect(await screen.findByText('Insufficient stock')).toBeInTheDocument();
+    // Checkout submission itself (methods, cash/change, confirmation, success/failure)
+    // is covered end-to-end in payment-modal.test.tsx - this just verifies the handoff.
+    expect(screen.getByText('Payment')).toBeInTheDocument();
+    expect(screen.getByText('Total Amount')).toBeInTheDocument();
+    expect(checkoutMock).not.toHaveBeenCalled();
   });
 });
 

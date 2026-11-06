@@ -50,6 +50,36 @@
   color: var(--color-text-primary);
 }
 
+.shiftPill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  cursor: pointer;
+  padding: 5px 10px;
+  border-radius: 999px;
+}
+
+.shiftPill:hover {
+  border-color: var(--color-border-strong);
+}
+
+.shiftDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.shiftDotOpen {
+  background: var(--color-success);
+}
+
 .iconButton {
   width: 32px;
   height: 32px;

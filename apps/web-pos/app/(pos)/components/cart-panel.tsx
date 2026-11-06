@@ -1,10 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
-import { isAxiosError } from 'axios';
 import { AnimatePresence, motion } from 'framer-motion';
-import { salesPosApi } from '../../../lib/api';
 import { useAuthStore } from '../../../lib/auth-store';
 import {
   cartDiscountAmount,
@@ -15,6 +12,7 @@ import {
   lineTotal,
   useCartStore,
 } from '../../../lib/cart-store';
+import { PaymentModal } from './payment-modal';
 import { ShoePlaceholderIcon } from './shoe-placeholder-icon';
 import styles from './cart-panel.module.css';
 
@@ -36,36 +34,14 @@ export function CartPanel() {
     setDiscountValue,
     clear,
   } = useCartStore();
-  const [lastSaleId, setLastSaleId] = useState<string | null>(null);
   const [confirmingClear, setConfirmingClear] = useState(false);
+  const [showPayment, setShowPayment] = useState(false);
   const canApplyDiscount = useAuthStore((s) => s.user?.permissions.includes('sales.create') ?? false);
 
   const subtotal = cartSubtotal(lines);
   const lineDiscountsTotal = cartLineDiscounts(lines);
   const cartDiscount = canApplyDiscount ? cartDiscountAmount(lines, discountMode, discountValue) : 0;
   const total = canApplyDiscount ? cartGrandTotal(lines, discountMode, discountValue) : subtotal - lineDiscountsTotal;
-
-  const checkout = useMutation({
-    mutationFn: () => {
-      const branchId = useAuthStore.getState().selectedBranchId;
-      if (!branchId) throw new Error('No branch selected for this session.');
-      return salesPosApi.checkout({
-        branchId,
-        idempotencyKey: crypto.randomUUID(),
-        lines: lines.map((l) => ({
-          variantId: l.variantId,
-          quantity: l.quantity,
-          ...(l.lineDiscount > 0 ? { lineDiscount: l.lineDiscount } : {}),
-        })),
-        payments: [{ method: 'CASH', amount: total }],
-        discountTotal: cartDiscount,
-      });
-    },
-    onSuccess: (sale) => {
-      setLastSaleId(sale.id);
-      clear();
-    },
-  });
 
   function handleClearCart() {
     if (!confirmingClear) {
@@ -83,24 +59,6 @@ export function CartPanel() {
   return (
     <div className={styles.panel}>
       <p className={styles.title}>Current Sale ({lines.length})</p>
-
-      {checkout.isError && (
-        <div className={styles.banner} role="alert">
-          {isAxiosError(checkout.error) && !checkout.error.response
-            ? 'Cannot reach the Sales & POS service. Is it running?'
-            : isAxiosError(checkout.error)
-              ? String(
-                  (checkout.error.response?.data as { message?: string | string[] } | undefined)?.message ??
-                    'Checkout failed.',
-                )
-              : (checkout.error as Error).message}
-        </div>
-      )}
-      {lastSaleId && !checkout.isError && (
-        <div className={styles.successBanner} role="status">
-          Sale completed ({lastSaleId.slice(0, 8)}…).
-        </div>
-      )}
 
       {lines.length === 0 ? (
         <div className={styles.emptyState}>Scan or select a product to start a sale.</div>
@@ -279,14 +237,14 @@ export function CartPanel() {
         </div>
 
         <motion.button
-          whileHover={{ scale: lines.length === 0 || checkout.isPending ? 1 : 1.01 }}
-          whileTap={{ scale: lines.length === 0 || checkout.isPending ? 1 : 0.98 }}
+          whileHover={{ scale: lines.length === 0 ? 1 : 1.01 }}
+          whileTap={{ scale: lines.length === 0 ? 1 : 0.98 }}
           type="button"
           className={styles.completeButton}
-          disabled={lines.length === 0 || checkout.isPending}
-          onClick={() => checkout.mutate()}
+          disabled={lines.length === 0}
+          onClick={() => setShowPayment(true)}
         >
-          {checkout.isPending ? 'Processing…' : 'Complete Sale'}
+          Complete Sale
         </motion.button>
 
         {confirmingClear ? (
@@ -305,6 +263,18 @@ export function CartPanel() {
           </button>
         )}
       </div>
+
+      {showPayment && (
+        <PaymentModal
+          lines={lines}
+          discountTotal={cartDiscount}
+          total={total}
+          onClose={() => setShowPayment(false)}
+          onSuccess={() => {
+            clear();
+          }}
+        />
+      )}
     </div>
   );
 }
